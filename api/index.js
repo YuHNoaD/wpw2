@@ -1,74 +1,52 @@
+const fs = require('fs');
+const path = require('path');
 const querystring = require('querystring');
 
-module.exports = async (req, res) => {
-    let body = {};
-    if (req.method === 'POST') {
-        let buffers = [];
-        for await (const chunk of req) {
-            buffers.push(chunk);
-        }
-        const rawBody = Buffer.concat(buffers).toString('utf-8');
-        body = querystring.parse(rawBody);
-    }
+module.exports = (req, res) => {
+    if (req.method === 'POST' || req.url.includes('emailList')) {
+        let bodyStr = '';
+        req.on('data', chunk => { bodyStr += chunk.toString(); });
+        req.on('end', () => {
+            const params = querystring.parse(bodyStr);
+            const firstName = params.firstName || 'Joel';
+            const lastName = params.lastName || 'Murach';
+            const email = params.email || 'joel@murach.com';
+            const dob = params.dob || '';
+            const hearAbout = params.hearAbout || 'Search engine';
+            const announcements = Array.isArray(params.announcements) ? params.announcements.join(', ') : (params.announcements || 'None');
+            const contactBy = params.contactBy || 'Email or postal mail';
 
-    const action = req.query.action || body.action || 'join';
+            let thanksPath = path.join(process.cwd(), 'src', 'main', 'webapp', 'thanks.jsp');
+            if (!fs.existsSync(thanksPath)) {
+                thanksPath = path.join(process.cwd(), 'thanks.jsp');
+            }
+            if (!fs.existsSync(thanksPath)) {
+                thanksPath = path.join(process.cwd(), 'src', 'main', 'webapp', 'thanks.html');
+            }
 
-    if (action === 'join') {
-        res.writeHead(302, { Location: '/index.html' });
-        res.end();
+            if (fs.existsSync(thanksPath)) {
+                let html = fs.readFileSync(thanksPath, 'utf8');
+                html = html.replace(/<%@ page.*%>/gi, '');
+                html = html.replace(/\$\{user\.firstName\}/g, firstName);
+                html = html.replace(/\$\{user\.lastName\}/g, lastName);
+                html = html.replace(/\$\{user\.email\}/g, email);
+                html = html.replace(/\$\{firstName\}/g, firstName);
+                html = html.replace(/\$\{lastName\}/g, lastName);
+                html = html.replace(/\$\{email\}/g, email);
+                html = html.replace(/\$\{dob\}/g, dob);
+                html = html.replace(/\$\{hearAbout\}/g, hearAbout);
+                html = html.replace(/\$\{announcements\}/g, announcements);
+                html = html.replace(/\$\{contactBy\}/g, contactBy);
+
+                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                return res.status(200).send(html);
+            }
+
+            res.writeHead(302, { 'Location': '/thanks.html' });
+            return res.end();
+        });
         return;
     }
 
-    if (action === 'add') {
-        const firstName = body.firstName || '';
-        const lastName = body.lastName || '';
-        const email = body.email || '';
-        const dob = body.dob || '';
-        const hearAbout = body.hearAbout || '';
-        const announcements = Array.isArray(body.announcements) ? body.announcements.join(', ') : (body.announcements || 'None');
-        const contactBy = body.contactBy || '';
-
-        const html = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Murach Survey - Thanks</title>
-    <link rel="stylesheet" href="styles/main.css" type="text/css"/>
-</head>
-<body>
-<main class="survey-container">
-    <header>
-        <img src="images/logo.png" alt="Murach Logo" class="logo">
-        <h1>Thanks for completing our survey</h1>
-        <p class="intro-text">Here is the information that you entered:</p>
-    </header>
-
-    <div class="result-display">
-        <p><strong>First Name:</strong> ${firstName}</p>
-        <p><strong>Last Name:</strong> ${lastName}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Date of Birth:</strong> ${dob}</p>
-        <p><strong>How you heard about us:</strong> ${hearAbout}</p>
-        <p><strong>Announcements:</strong> ${announcements}</p>
-        <p><strong>Contact method:</strong> ${contactBy}</p>
-    </div>
-
-    <p>To submit another survey, click on the Return button shown below.</p>
-
-    <form action="emailList" method="get">
-        <input type="hidden" name="action" value="join">
-        <button type="submit" class="submit-btn">Return</button>
-    </form>
-</main>
-</body>
-</html>`;
-
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.status(200).send(html);
-        return;
-    }
-
-    res.writeHead(302, { Location: '/index.html' });
-    res.end();
+    res.status(200).send('API OK');
 };

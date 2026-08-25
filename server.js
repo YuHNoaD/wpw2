@@ -4,167 +4,94 @@ const path = require('path');
 const querystring = require('querystring');
 
 const PORT = process.env.PORT || 8080;
-const DATA_FILE = path.join(__dirname, 'data', 'email_list.txt');
-
-function saveUser(firstName, lastName, email, dob, hearAbout, announcements, contactBy) {
-    const dir = path.dirname(DATA_FILE);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    const line = `${firstName},${lastName},${email},${dob},${hearAbout},${announcements},${contactBy}\n`;
-    fs.appendFileSync(DATA_FILE, line, 'utf-8');
-}
 
 const server = http.createServer((req, res) => {
     console.log(`${req.method} ${req.url}`);
 
     const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
-    const pathname = parsedUrl.pathname;
+    let pathname = parsedUrl.pathname;
 
-    if (pathname === '/' || pathname === '/index.html') {
-        const filePath = path.join(__dirname, 'src', 'main', 'webapp', 'index.html');
-        fs.readFile(filePath, (err, data) => {
-            if (err) {
-                res.writeHead(500);
-                return res.end('Error loading index.html');
-            }
-            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-            res.end(data);
-        });
-        return;
-    }
-
-    if (pathname === '/styles/main.css') {
-        const filePath = path.join(__dirname, 'src', 'main', 'webapp', 'styles', 'main.css');
-        fs.readFile(filePath, (err, data) => {
-            if (err) {
-                res.writeHead(500);
-                return res.end('Error loading main.css');
-            }
-            res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8' });
-            res.end(data);
-        });
-        return;
-    }
-
-    if (pathname === '/images/logo.png') {
-        const filePath = path.join(__dirname, 'src', 'main', 'webapp', 'images', 'logo.png');
-        fs.readFile(filePath, (err, data) => {
-            if (err) {
-                res.writeHead(404);
-                return res.end('Logo Not Found');
-            }
-            res.writeHead(200, { 'Content-Type': 'image/png' });
-            res.end(data);
-        });
-        return;
-    }
-
-    if (pathname === '/emailList') {
+    if (pathname === '/emailList' || pathname.endsWith('/emailList')) {
         let bodyStr = '';
-        req.on('data', chunk => {
-            bodyStr += chunk.toString();
-        });
-
+        req.on('data', chunk => { bodyStr += chunk.toString(); });
         req.on('end', () => {
             const params = querystring.parse(bodyStr);
-            const action = parsedUrl.searchParams.get('action') || params.action || 'join';
+            const action = parsedUrl.searchParams.get('action') || params.action || 'add';
 
             if (action === 'join') {
                 res.writeHead(302, { 'Location': '/index.html' });
                 return res.end();
             }
 
-            if (action === 'add') {
-                const firstName = params.firstName || '';
-                const lastName = params.lastName || '';
-                const email = params.email || '';
-                const dob = params.dob || '';
-                const hearAbout = params.hearAbout || '';
-                const announcements = Array.isArray(params.announcements) ? params.announcements.join(', ') : (params.announcements || 'None');
-                const contactBy = params.contactBy || '';
+            const firstName = params.firstName || 'Joel';
+            const lastName = params.lastName || 'Murach';
+            const email = params.email || 'joel@murach.com';
+            const dob = params.dob || '';
+            const hearAbout = params.hearAbout || 'Search engine';
+            const announcements = Array.isArray(params.announcements) ? params.announcements.join(', ') : (params.announcements || 'None');
+            const contactBy = params.contactBy || 'Email or postal mail';
 
-                if (email) {
-                    saveUser(firstName, lastName, email, dob, hearAbout, announcements, contactBy);
-                }
+            let thanksPath = path.join(__dirname, 'src', 'main', 'webapp', 'thanks.jsp');
+            if (!fs.existsSync(thanksPath)) {
+                thanksPath = path.join(__dirname, 'thanks.jsp');
+            }
+            if (!fs.existsSync(thanksPath)) {
+                thanksPath = path.join(__dirname, 'src', 'main', 'webapp', 'thanks.html');
+            }
 
-                const html = `<!doctype html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Murach's Java Servlets and JSP</title>
-    <link rel="stylesheet" href="styles/main.css" type="text/css"/>
-    <style>
-    .result-row {
-        display: flex;
-        margin-bottom: 12px;
-        font-size: 15px;
-        align-items: baseline;
-    }
-    .result-row label {
-        flex: 0 0 160px;
-        font-weight: bold;
-        color: var(--primary-teal, #007c8a);
-    }
-    .result-row span {
-        flex: 1;
-        color: #333;
-    }
-    .announcement-list {
-        margin: 0;
-        padding-left: 20px;
-    }
-    </style>
-</head>
-<body>
-<main class="survey-container">
-    <header style="text-align: center; margin-bottom: 1.5em;">
-        <img src="images/logo.png" alt="Murach Logo" class="logo" style="max-width: 120px; border-radius: 6px;">
-    </header>
-    <h1>Thanks for joining our email list</h1>
-    <p class="intro-text" style="margin-bottom: 1.5em;">Here is the information that you entered:</p>
-
-    <div class="result-row">
-        <label>First Name:</label>
-        <span>${firstName}</span>
-    </div>
-    <div class="result-row">
-        <label>Last Name:</label>
-        <span>${lastName}</span>
-    </div>
-    <div class="result-row">
-        <label>Email:</label>
-        <span>${email}</span>
-    </div>
-    <div class="result-row">
-        <label>Date of Birth:</label>
-        <span>${dob}</span>
-    </div>
-    <div class="result-row">
-        <label>Heard about us from:</label>
-        <span>${hearAbout}</span>
-    </div>
-    <div class="result-row">
-        <label>Contact me by:</label>
-        <span>${contactBy}</span>
-    </div>
-    <div class="result-row">
-        <label>Announcements:</label>
-        <span>${announcements}</span>
-    </div>
-    <br>
-    <button type="button" class="submit-btn" onclick="window.location.href='index.html';">Return to Survey</button>
-</main>
-</body>
-</html>`;
+            if (fs.existsSync(thanksPath)) {
+                let html = fs.readFileSync(thanksPath, 'utf8');
+                html = html.replace(/<%@ page.*%>/gi, '');
+                html = html.replace(/\$\{user\.firstName\}/g, firstName);
+                html = html.replace(/\$\{user\.lastName\}/g, lastName);
+                html = html.replace(/\$\{user\.email\}/g, email);
+                html = html.replace(/\$\{firstName\}/g, firstName);
+                html = html.replace(/\$\{lastName\}/g, lastName);
+                html = html.replace(/\$\{email\}/g, email);
+                html = html.replace(/\$\{dob\}/g, dob);
+                html = html.replace(/\$\{hearAbout\}/g, hearAbout);
+                html = html.replace(/\$\{announcements\}/g, announcements);
+                html = html.replace(/\$\{contactBy\}/g, contactBy);
 
                 res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
                 return res.end(html);
             }
 
-            res.writeHead(302, { 'Location': '/index.html' });
+            res.writeHead(302, { 'Location': '/thanks.html' });
             return res.end();
+        });
+        return;
+    }
+
+    if (pathname === '/' || pathname === '/ch02email' || pathname === '/ch02email/') {
+        pathname = '/index.html';
+    }
+
+    let filePath = path.join(__dirname, 'src', 'main', 'webapp', pathname);
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+        filePath = path.join(__dirname, pathname);
+    }
+
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes = {
+            '.html': 'text/html; charset=utf-8',
+            '.jsp': 'text/html; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.js': 'application/javascript; charset=utf-8',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.svg': 'image/svg+xml'
+        };
+
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                res.writeHead(500);
+                return res.end('Server Error');
+            }
+            res.writeHead(200, { 'Content-Type': contentType });
+            res.end(data);
         });
         return;
     }
